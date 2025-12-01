@@ -2,3 +2,4 @@
 releaseBranch = "main"
 versionFile = "VERSION"
 command = "scripts/sync_zig_version.sh"
+vPrefix = true
