@@ -1,0 +1,48 @@
+version: 2
+project_name: slack-cli
+
+builds:
+  - id: darwin-arm64
+    builder: custom
+    goos: [darwin]
+    goarch: [arm64]
+    tool: zig
+    command: zig
+    args: ["build", "-Dtarget=aarch64-macos", "-Doptimize=ReleaseSafe", "--prefix", "dist/darwin-arm64"]
+    binary: dist/darwin-arm64/bin/slack-cli
+
+  - id: linux-amd64
+    builder: custom
+    goos: [linux]
+    goarch: [amd64]
+    tool: zig
+    command: zig
+    args: ["build", "-Dtarget=x86_64-linux", "-Doptimize=ReleaseSafe", "--prefix", "dist/linux-amd64"]
+    binary: dist/linux-amd64/bin/slack-cli
+
+  - id: windows-amd64
+    builder: custom
+    goos: [windows]
+    goarch: [amd64]
+    tool: zig
+    command: zig
+    args: ["build", "-Dtarget=x86_64-windows", "-Doptimize=ReleaseSafe", "--prefix", "dist/windows-amd64"]
+    binary: dist/windows-amd64/bin/slack-cli.exe
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+
+brews:
+  - repository:
+      owner: ainoya
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://github.com/ainoya/slack-cli"
+    description: "Slack CLI tool"
+    install: |
+      bin.install "slack-cli"
