@@ -1,8 +1,12 @@
 #!/bin/sh
 set -e
 
-# Read version from VERSION file
-VERSION=$(cat VERSION)
+# Read version from argument if provided, otherwise from VERSION file
+if [ -n "$1" ]; then
+  VERSION="$1"
+else
+  VERSION=$(cat VERSION)
+fi
 
 # Remove 'v' prefix if present
 VERSION=${VERSION#v}
