@@ -22,7 +22,7 @@ archives:
 brews:
   - repository:
       owner: ainoya
-      name: homebrew-tap
+      name: slack-cli
     directory: Formula
     homepage: "https://github.com/ainoya/slack-cli"
     description: "Slack CLI tool"
