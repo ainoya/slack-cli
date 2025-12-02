@@ -19,12 +19,10 @@ archives:
     files:
       - README.md
 
-brews:
+homebrew_casks:
   - repository:
       owner: ainoya
       name: slack-cli
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/ainoya/slack-cli"
     description: "Slack CLI tool"
-    install: |
-      bin.install "slack-cli"
