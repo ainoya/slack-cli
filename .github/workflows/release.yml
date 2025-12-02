@@ -55,6 +55,10 @@ jobs:
         with:
           app-id: 1053852
           private-key: ${{ secrets.AINOYA_BOT_PRIVATE_KEY }}
+          owner: ainoya
+          repositories: |
+            homebrew-tap
+            slack-cli
 
       - uses: goreleaser/goreleaser-action@v6
         with:
