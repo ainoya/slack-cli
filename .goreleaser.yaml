@@ -24,7 +24,7 @@ archives:
 homebrew_casks:
   - repository:
       owner: ainoya
-      name: slack-cli
-    directory: Casks
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/ainoya/slack-cli"
     description: "Slack CLI tool"

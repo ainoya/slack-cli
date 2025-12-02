@@ -50,6 +50,11 @@ jobs:
       - uses: jdx/mise-action@v2
         with:
           cache: true
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: 1053852
+          private-key: ${{ secrets.AINOYA_BOT_PRIVATE_KEY }}
 
       - uses: goreleaser/goreleaser-action@v6
         with:
@@ -60,3 +65,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # If you have a separate token for Homebrew Tap, add it here.
           # For now assuming GITHUB_TOKEN has permissions or user will configure it.
+          TAP_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
