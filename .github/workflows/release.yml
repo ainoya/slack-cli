@@ -70,3 +70,9 @@ jobs:
           # If you have a separate token for Homebrew Tap, add it here.
           # For now assuming GITHUB_TOKEN has permissions or user will configure it.
           TAP_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          
+          # Sign the binary
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
