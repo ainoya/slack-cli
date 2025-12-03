@@ -19,6 +19,13 @@ Command-line tool for Slack built with Zig. Features include searching Slack mes
 
 ## Installation
 
+### Homebrew (macOS)
+
+```bash
+brew tap ainoya/tap
+brew install ainoya/tap/slack-cli
+```
+
 ### Install Zig
 
 Using asdf:
