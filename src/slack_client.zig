@@ -4,17 +4,64 @@ pub const SlackClient = struct {
     allocator: std.mem.Allocator,
     token: []const u8,
     http_client: std.http.Client,
+    workspace_url: ?[]const u8 = null,
 
     pub fn init(allocator: std.mem.Allocator, token: []const u8) SlackClient {
         return .{
             .allocator = allocator,
             .token = token,
             .http_client = std.http.Client{ .allocator = allocator },
+            .workspace_url = null,
         };
     }
 
     pub fn deinit(self: *SlackClient) void {
+        if (self.workspace_url) |url| {
+            self.allocator.free(url);
+        }
         self.http_client.deinit();
+    }
+
+    /// Get workspace URL from auth.test API
+    fn getWorkspaceUrl(self: *SlackClient) ![]const u8 {
+        if (self.workspace_url) |url| {
+            return url;
+        }
+
+        const response = try self.makeGetRequest("auth.test", "");
+        defer self.allocator.free(response);
+
+        var parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, response, .{});
+        defer parsed.deinit();
+
+        const root = parsed.value.object;
+        if (root.get("url")) |url_val| {
+            // URL is like "https://workspace.slack.com/"
+            const url_str = url_val.string;
+            // Remove trailing slash if present
+            const trimmed = if (url_str.len > 0 and url_str[url_str.len - 1] == '/')
+                url_str[0 .. url_str.len - 1]
+            else
+                url_str;
+            self.workspace_url = try self.allocator.dupe(u8, trimmed);
+            return self.workspace_url.?;
+        }
+
+        return error.WorkspaceUrlNotFound;
+    }
+
+    /// Format message URL
+    fn formatMessageUrl(workspace_url: []const u8, channel_id: []const u8, ts: []const u8, buffer: []u8) ![]const u8 {
+        // Convert timestamp "1234567890.123456" to "p1234567890123456"
+        var ts_buffer: [32]u8 = undefined;
+        var ts_idx: usize = 0;
+        for (ts) |c| {
+            if (c != '.') {
+                ts_buffer[ts_idx] = c;
+                ts_idx += 1;
+            }
+        }
+        return std.fmt.bufPrint(buffer, "{s}/archives/{s}/p{s}", .{ workspace_url, channel_id, ts_buffer[0..ts_idx] });
     }
 
     /// Send GET request to Slack API (using Zig standard library HTTP client)
@@ -84,8 +131,10 @@ pub const SlackClient = struct {
         const response = try self.makeGetRequest("search.messages", query_params);
         defer self.allocator.free(response);
 
+        const workspace_url = try self.getWorkspaceUrl();
+
         // Parse JSON and display results
-        try self.printSearchResults(response);
+        try printSearchResults(response, workspace_url);
     }
 
     /// Search messages (kept for backward compatibility)
@@ -101,7 +150,8 @@ pub const SlackClient = struct {
 
     /// Get channel messages
     pub fn getChannelMessages(self: *SlackClient, channel_name: []const u8) !void {
-        // First get channel ID
+        const workspace_url = try self.getWorkspaceUrl();
+
         const channel_id = try self.getChannelId(channel_name);
         defer self.allocator.free(channel_id);
 
@@ -116,7 +166,70 @@ pub const SlackClient = struct {
         const response = try self.makeGetRequest("conversations.history", query_params);
         defer self.allocator.free(response);
 
-        try self.printChannelMessages(response);
+        try printChannelMessages(response, workspace_url, channel_id);
+    }
+
+    /// Get channel ID from channel name
+    fn getChannelId(self: *SlackClient, channel_name: []const u8) ![]u8 {
+        // Strip leading '#' if present
+        const name_to_search = if (channel_name.len > 0 and channel_name[0] == '#')
+            channel_name[1..]
+        else
+            channel_name;
+
+        var cursor: ?[]const u8 = null;
+        defer if (cursor) |c| self.allocator.free(c);
+
+        while (true) {
+            var query_params_buffer: [512]u8 = undefined;
+            const query_params = if (cursor) |c|
+                try std.fmt.bufPrint(&query_params_buffer, "limit=200&types=public_channel&cursor={s}", .{c})
+            else
+                try std.fmt.bufPrint(&query_params_buffer, "limit=200&types=public_channel", .{});
+
+            const response = try self.makeGetRequest("conversations.list", query_params);
+            defer self.allocator.free(response);
+
+            var parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, response, .{});
+            defer parsed.deinit();
+
+            const root = parsed.value.object;
+
+            const ok = root.get("ok").?.bool;
+            if (!ok) {
+                if (root.get("error")) |error_val| {
+                    std.debug.print("Slack API Error: {s}\n", .{error_val.string});
+                }
+                return try self.allocator.dupe(u8, "");
+            }
+
+            const channels = root.get("channels").?.array;
+
+            for (channels.items) |channel| {
+                const name = channel.object.get("name").?.string;
+                if (std.mem.eql(u8, name, name_to_search)) {
+                    const id = channel.object.get("id").?.string;
+                    return try self.allocator.dupe(u8, id);
+                }
+            }
+
+            // Check for next page
+            if (cursor) |c| self.allocator.free(c);
+            cursor = null;
+
+            if (root.get("response_metadata")) |metadata| {
+                if (metadata.object.get("next_cursor")) |next| {
+                    if (next.string.len > 0) {
+                        cursor = try self.allocator.dupe(u8, next.string);
+                        continue;
+                    }
+                }
+            }
+
+            break;
+        }
+
+        return try self.allocator.dupe(u8, "");
     }
 
     /// Get user messages
@@ -141,29 +254,8 @@ pub const SlackClient = struct {
         const response = try self.makeGetRequest("search.messages", query_params);
         defer self.allocator.free(response);
 
-        try self.printSearchResults(response);
-    }
-
-    /// Get channel ID from channel name
-    fn getChannelId(self: *SlackClient, channel_name: []const u8) ![]u8 {
-        const response = try self.makeGetRequest("conversations.list", "limit=1000");
-        defer self.allocator.free(response);
-
-        var parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, response, .{});
-        defer parsed.deinit();
-
-        const root = parsed.value.object;
-        const channels = root.get("channels").?.array;
-
-        for (channels.items) |channel| {
-            const name = channel.object.get("name").?.string;
-            if (std.mem.eql(u8, name, channel_name)) {
-                const id = channel.object.get("id").?.string;
-                return try self.allocator.dupe(u8, id);
-            }
-        }
-
-        return try self.allocator.dupe(u8, "");
+        const workspace_url = try self.getWorkspaceUrl();
+        try printSearchResults(response, workspace_url);
     }
 
     /// Get user ID from username
@@ -208,8 +300,8 @@ pub const SlackClient = struct {
     }
 
     /// Print search results
-    fn printSearchResults(self: *SlackClient, response: []const u8) !void {
-        var parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, response, .{});
+    fn printSearchResults(response: []const u8, workspace_url: []const u8) !void {
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.heap.page_allocator, response, .{});
         defer parsed.deinit();
 
         const root = parsed.value.object;
@@ -258,11 +350,20 @@ pub const SlackClient = struct {
             const user_str = if (username == .string) username.string else "unknown";
             std.debug.print("\n[{d}] {s}:\n{s}\n", .{ i + 1, user_str, text });
 
-            // タイムスタンプを表示
+            // Display timestamp
             if (message.object.get("ts")) |ts| {
                 var ts_buffer: [64]u8 = undefined;
                 const timestamp = formatTimestamp(ts.string, &ts_buffer) catch "unknown time";
                 std.debug.print("Posted: {s} UTC\n", .{timestamp});
+
+                // Display URL
+                if (message.object.get("channel")) |channel| {
+                    if (channel.object.get("id")) |channel_id| {
+                        var url_buffer: [256]u8 = undefined;
+                        const msg_url = formatMessageUrl(workspace_url, channel_id.string, ts.string, &url_buffer) catch "unknown";
+                        std.debug.print("URL: {s}\n", .{msg_url});
+                    }
+                }
             }
 
             if (message.object.get("channel")) |channel| {
@@ -276,8 +377,8 @@ pub const SlackClient = struct {
     }
 
     /// Print channel messages
-    fn printChannelMessages(self: *SlackClient, response: []const u8) !void {
-        var parsed = try std.json.parseFromSlice(std.json.Value, self.allocator, response, .{});
+    fn printChannelMessages(response: []const u8, workspace_url: []const u8, channel_id: []const u8) !void {
+        var parsed = try std.json.parseFromSlice(std.json.Value, std.heap.page_allocator, response, .{});
         defer parsed.deinit();
 
         const root = parsed.value.object;
@@ -313,6 +414,10 @@ pub const SlackClient = struct {
                 var ts_buffer: [64]u8 = undefined;
                 const timestamp = formatTimestamp(ts.string, &ts_buffer) catch "unknown time";
                 std.debug.print("Posted: {s} UTC\n", .{timestamp});
+
+                var url_buffer: [256]u8 = undefined;
+                const msg_url = formatMessageUrl(workspace_url, channel_id, ts.string, &url_buffer) catch "unknown";
+                std.debug.print("URL: {s}\n", .{msg_url});
             }
         }
 
