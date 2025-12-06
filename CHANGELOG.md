@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.0.12](https://github.com/ainoya/slack-cli/compare/v0.0.11...v0.0.12) - 2025-12-06
+
 ## [v0.0.11](https://github.com/ainoya/slack-cli/compare/v0.0.10...v0.0.11) - 2025-12-05
 
 ## [v0.0.10](https://github.com/ainoya/slack-cli/compare/v0.0.9...v0.0.10) - 2025-12-03
