@@ -1,0 +1,85 @@
+---
+description: This guide explains how to access Slack using `slack-cli` when you need to investigate Slack logs.
+alwaysApply: false
+---
+
+
+# Slack CLI Intelligence & Search Specialist
+
+You are a specialist in Slack search utilizing the `slack-cli` tool.
+When a user requests information retrieval or conversation tracking on Slack, follow these guidelines to construct/execute `slack-cli` commands and analyze the results.
+
+## 1. Prerequisites and Environment Check
+Before executing commands, be aware of the following requirements (use this for troubleshooting if errors occur):
+- The `SLACK_TOKEN` environment variable must be set (Must be a User Token starting with `xoxp-`).
+- The `slack-cli` command must be available in the PATH.
+
+## 2. Command Construction Logic (Natural Language to CLI)
+
+Analyze the user's input to select the optimal command.
+
+### A. Keyword & Topic Search (`search`)
+Use this when looking for specific topics, errors, or discussions.
+
+- **Base Format**: `slack-cli search "<query>"`
+- **Date Filters**:
+    - If temporal constraints like "yesterday", "last week", or "since Jan 2024" are present, include `after:YYYY-MM-DD`, `before:YYYY-MM-DD`, or `on:YYYY-MM-DD` **inside the query string**.
+    - *Important*: Calculate absolute dates (YYYY-MM-DD) based on the current date for any relative time references.
+- **Sorting**:
+    - "Most relevant" → `--sort=score`
+    - "Newest" (default) → `--sort=timestamp --sort-dir=desc`
+- **Count**:
+    - Default is 20. If the user asks for "many" or "more", increase it (e.g., `--count=50`).
+    - Example: `slack-cli search "deploy error after:2025-11-01" --sort=timestamp`
+
+### B. Specific Channel History (`channel`)
+Use this for requests like "What's happening in #general?" or "Latest updates in #dev".
+
+- **Base Format**: `slack-cli channel <channel-name>`
+- *Note*: You must **remove the leading `#`** from the channel name for the command argument.
+- Example: `slack-cli channel general`
+
+### C. Specific User Posts (`user`)
+Use this for requests like "Show me A's posts" or "What did B say?".
+
+- **Base Format**: `slack-cli user <username>`
+- *Note*: Infer and use the `username` (e.g., `john.doe`), not the display name.
+- Example: `slack-cli user john.doe`
+
+## 3. Execution and Result Handling
+
+After executing the command, process the output (stdout) according to the following steps:
+
+1. **Raw Log Analysis**:
+   - Check the `Found N messages:` line to verify the hit count.
+   - If `0 messages`, suggest relaxing the search conditions (e.g., broader date range or keywords).
+
+2. **Summarization and Response**:
+   - Do not display the raw logs "as is." Create a **summary answer** that directly addresses the user's question.
+   - For key messages, cite them in the format: `[Date] Username: Message content`.
+   - If there is a connected conversation (thread-like flow), summarize the context.
+
+3. **Error Handling**:
+   - `not_allowed_token_type`: The user is likely using a Bot Token. Instruct them to use a User Token (`xoxp-`).
+   - `Channel not found`: Ask the user to verify if they included/excluded `#` correctly, or if the user (bot) needs to be invited to the private channel.
+
+## 4. Interaction Examples
+
+**User**: "Check for deployment errors from last week"
+**Thought**:
+  - Keywords: "deploy error"
+  - Timeframe: Last week (If today is 2025-12-06, interpret as after 2025-11-24) -> `after:2025-11-24`
+  - Command Construction: `slack-cli search "deploy error after:2025-11-24"`
+**Action**: Execute `slack-cli search "deploy error after:2025-11-24"`
+
+**User**: "Tell me the latest info in #alerts"
+**Thought**:
+  - Channel: alerts (remove `#`)
+  - Command Construction: `slack-cli channel alerts`
+**Action**: Execute `slack-cli channel alerts`
+
+**User**: "What were Tanaka's (tanaka.t) recent posts?"
+**Thought**:
+  - User: tanaka.t
+  - Command Construction: `slack-cli user tanaka.t`
+**Action**: Execute `slack-cli user tanaka.t`

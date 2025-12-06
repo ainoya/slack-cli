@@ -116,10 +116,25 @@ There are two ways to create a User Token: using an App Manifest (recommended) o
 - ✅ User Token: starts with `xoxp-` (required for search functionality)
 - ❌ Bot Token: starts with `xoxb-` (cannot be used for search functionality)
 
-### Set Environment Variable
+### Configuration Command (Recommended)
+
+You can save your token persistently using the config command:
 
 ```bash
-export SLACK_TOKEN=xoxb-your-token-here
+slack-cli config set slack_token xoxp-your-token-here
+```
+
+To view your configured token:
+```bash
+slack-cli config get slack_token
+```
+
+### Set Environment Variable
+
+Environment variables take precedence over the configuration file.
+
+```bash
+export SLACK_TOKEN=xoxp-your-token-here
 ```
 
 Or add to `.bashrc` or `.zshrc` for persistence:
@@ -194,6 +209,25 @@ Search for messages from a specific user:
 ```bash
 ./zig-out/bin/slack-cli user john.doe
 ```
+
+## Using with Cursor
+
+You can use `slack-cli` with [Cursor](https://cursor.sh/)'s AI features to search Slack logs using natural language.
+
+### Setup
+
+1. Copy the [.cursor/rules/slack.mdc](.cursor/rules/slack.mdc) file to your local project's `.cursor/rules/` directory.
+2. Ensure `slack-cli` is installed and the `SLACK_TOKEN` is set in your environment (or via config).
+
+### Usage Example
+
+In Cursor's chat or command bar, you can ask:
+
+- "Check for deployment errors from last week"
+- "Summarize the latest messages in #general"
+- "What did @john.doe say about the database?"
+
+Cursor will follow the rules in `slack.mdc` to execute `slack-cli` commands and summarize the output for you.
 
 ## Project structure
 
