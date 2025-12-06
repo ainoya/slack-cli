@@ -58,6 +58,45 @@ After a successful build, the executable will be generated at `zig-out/bin/slack
 
 #### Creating a User Token
 
+There are two ways to create a User Token: using an App Manifest (recommended) or configuring manually from scratch.
+
+##### Option 1: Using App Manifest (Recommended)
+
+1. Visit [Slack API](https://api.slack.com/apps)
+2. Select "Create New App" → "From an app manifest"
+3. Select the workspace and click "Next"
+4. Copy and paste the following JSON into the text area (Select "JSON" tab if needed):
+
+   ```json
+   {
+     "display_information": {
+       "name": "Slack CLI"
+     },
+     "oauth_config": {
+       "scopes": {
+         "user": [
+           "search:read",
+           "channels:history",
+           "channels:read",
+           "users:read"
+         ]
+       }
+     },
+     "settings": {
+       "org_deploy_enabled": false,
+       "socket_mode_enabled": false,
+       "token_rotation_enabled": false
+     }
+   }
+   ```
+
+5. Click "Next", then "Create"
+6. Click "Install to Workspace" at the top of the page
+7. Review permissions and click "Allow"
+8. Copy the **"User OAuth Token"** (token starting with `xoxp-`)
+
+##### Option 2: From scratch (Manual)
+
 1. Visit [Slack API](https://api.slack.com/apps)
 2. Select "Create New App" → "From scratch"
 3. Choose app name and workspace, then create
